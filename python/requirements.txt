@@ -1,0 +1,8 @@
+inquirer
+python-dotenv
+rich
+websockets
+msgpack
+urllib3
+certifi
+git+https://github.com/dnse-tech/openapi-sdk.git
