@@ -133,24 +133,38 @@ def add_config():
 
     symbol = input("Mã cổ phiếu: ").upper()
 
+    mode = inquirer.prompt([
+        inquirer.List(
+            "mode",
+            message="Chế độ",
+            choices=[
+                "Thường (cần đủ sức mua/bán)",
+                "Đợi T+ (không cần đủ sức mua/bán, bắt buộc thời gian)"
+            ]
+        )
+    ])["mode"]
+
+    is_tplus = "Đợi T+" in mode
+
     side_vn = inquirer.prompt([
         inquirer.List("side", message="Loại lệnh", choices=["MUA", "BÁN"])
     ])["side"]
 
     side = SIDE_MAP_VN_TO_EN[side_vn]
 
-    price = float(input("Giá mục tiêu: "))
+    price = None
+    threshold = None
 
-    # --------------------------
-    # GET LOAN PACKAGE
-    # --------------------------
-    status, body = rest_client.get_loan_packages(
+    if not is_tplus:
+        price = float(input("Giá mục tiêu: "))
+
+    status_api, body = rest_client.get_loan_packages(
         account_no=account_no,
         market_type="STOCK",
         symbol=symbol,
     )
 
-    if status != 200:
+    if status_api != 200:
         print("❌ Không lấy được gói vay\n")
         pause()
         return
@@ -164,40 +178,37 @@ def add_config():
             break
 
     if not loan_package_id:
-        print("❌ Không tìm thấy gói vay phù hợp (initialRate=1)\n")
+        print("❌ Không tìm thấy gói vay phù hợp\n")
         pause()
         return
 
-    # --------------------------
-    # PPE CHECK
-    # --------------------------
-    status, body = rest_client.get_ppse(
-        account_no=account_no,
-        market_type="STOCK",
-        symbol=symbol,
-        price=int(price * 1000) if price < 1000 else int(price),
-        loan_package_id=loan_package_id,
-        dry_run=False,
-    )
+    qmax_buy, qmax_sell = 0, 0
 
-    if status != 200:
-        print("❌ Không lấy được PPE\n")
-        pause()
-        return
+    if not is_tplus:
+        status_api, body = rest_client.get_ppse(
+            account_no=account_no,
+            market_type="STOCK",
+            symbol=symbol,
+            price=int(price * 1000) if price < 1000 else int(price),
+            loan_package_id=loan_package_id,
+            dry_run=False,
+        )
 
-    body = json.loads(body)
+        if status_api != 200:
+            print("❌ Không lấy được PPE\n")
+            pause()
+            return
 
-    qmax_buy = body.get("qmaxBuy", 0)
-    qmax_sell = body.get("qmaxSell", 0)
+        body = json.loads(body)
 
-    print("\n--- GIỚI HẠN GIAO DỊCH ---")
-    print(f"Max MUA : {qmax_buy}")
-    print(f"Max BÁN : {qmax_sell}")
-    print("--------------------------\n")
+        qmax_buy = body.get("qmaxBuy", 0)
+        qmax_sell = body.get("qmaxSell", 0)
 
-    # --------------------------
-    # INPUT QTY VALIDATION
-    # --------------------------
+        print("\n--- GIỚI HẠN GIAO DỊCH ---")
+        print(f"Max MUA : {qmax_buy}")
+        print(f"Max BÁN : {qmax_sell}")
+        print("--------------------------\n")
+
     while True:
         try:
             qty = int(input("\nNhập khối lượng: "))
@@ -205,38 +216,43 @@ def add_config():
             print("\n❌ Nhập số hợp lệ\n")
             continue
 
-        exceed = False
         status = "✅ Cấu hình hợp lệ"
 
-        if side == "BUY" and qty > qmax_buy:
-            print(f"\n⚠️ Vượt sức mua tài khoản ({qty} > {qmax_buy})")
-            exceed = True
+        if not is_tplus:
+            exceed = False
 
-        if side == "SELL" and qty > qmax_sell:
-            print(f"\n⚠️ Vượt sức bán tài khoản ({qty} > {qmax_sell})")
-            exceed = True
+            if side == "BUY" and qty > qmax_buy:
+                print(f"\n⚠️ Vượt sức mua ({qty} > {qmax_buy})")
+                exceed = True
 
-        if exceed:
-            confirm = input("\nVẫn sử dụng số trên? (y/n): ").lower()
-            status = "⚠️. Vượt giới hạn giao dịch"
-            if confirm != "y":
-                continue
+            if side == "SELL" and qty > qmax_sell:
+                print(f"\n⚠️ Vượt sức bán ({qty} > {qmax_sell})")
+                exceed = True
+
+            if exceed:
+                confirm = input("\nVẫn dùng? (y/n): ").lower()
+                status = "⚠️ Vượt giới hạn"
+                if confirm != "y":
+                    continue
+        else:
+            status = "⏳ Chờ T+"
 
         break
 
-    threshold = int(input("\nNgưỡng khối lượng kích hoạt: "))
+    if not is_tplus:
+        threshold = int(input("\nNgưỡng khối lượng kích hoạt: "))
 
-    # --------------------------
-    # INPUT EXECUTION TIME (OPTIONAL)
-    # --------------------------
     time_execute = None
 
     while True:
-        time_input = input("\nThời gian thực hiện (HH:MM:SS, bỏ trống nếu không dùng tính năng này): ").strip()
+        time_input = input("\nThời gian (HH:MM:SS): ").strip()
 
         if time_input == "":
-            time_execute = None
-            break
+            if is_tplus:
+                print("\n❌ T+ bắt buộc nhập thời gian\n")
+                continue
+            else:
+                break
 
         try:
             h, m, s = map(int, time_input.split(":"))
@@ -246,11 +262,8 @@ def add_config():
             else:
                 print("\n❌ Thời gian không hợp lệ\n")
         except:
-            print("\n❌ Định dạng phải là HH:MM:SS\n")
+            print("\n❌ Format HH:MM:SS\n")
 
-    # --------------------------
-    # SAVE CONFIG
-    # --------------------------
     new_cfg = {
         "symbol": symbol,
         "order_side": side,
@@ -259,29 +272,31 @@ def add_config():
         "qty_threshold": threshold,
         "loan_package_id": loan_package_id,
         "time_execute": time_execute,
-        "status": status
+        "status": status,
+        "mode": "TPLUS" if is_tplus else "NORMAL"
     }
 
     config.append(new_cfg)
     save_config(config)
 
-    # --------------------------
-    # PRINT RESULT (FIXED)
-    # --------------------------
     print("\n✅ ĐÃ THÊM CẤU HÌNH:\n")
 
     print(f"Mã: {new_cfg['symbol']}")
+    print(f"Mode        : {new_cfg['mode']}")
     print(f"Loại lệnh   : {side_vn}")
     print(f"Khối lượng  : {new_cfg['quantity']}")
-    print(f"Giá mục tiêu: {new_cfg['price']}")
-    print(f"Ngưỡng KL   : {new_cfg['qty_threshold']}")
+
+    if not is_tplus:
+        print(f"Giá mục tiêu: {new_cfg['price']}")
+        print(f"Ngưỡng KL   : {new_cfg['qty_threshold']}")
+
     print(f"Gói vay     : {new_cfg['loan_package_id']}")
-    print(f"\nThời gian thực hiện: {new_cfg['time_execute']}")
-    print(f"Trạng thái cài đặt: {new_cfg['status']}")
+    print(f"\nThời gian   : {new_cfg['time_execute']}")
+    print(f"Trạng thái  : {new_cfg['status']}")
     print("-" * 50)
 
     pause()
-    
+        
 # --------------------------
 # DELETE CONFIG
 # --------------------------
