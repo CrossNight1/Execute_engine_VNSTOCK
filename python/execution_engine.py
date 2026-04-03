@@ -33,9 +33,9 @@ class ExecutionEngine:
             "bid_qty": None,
             "ask_px": None,
             "ask_qty": None,
-            "signal": "",
-            "pending": "",
-            "tplus": "-"
+            "signal": Text(""),
+            "pending": Text(""),
+            "tplus": Text("-")
         })
 
         self.last_exec_time = {}
@@ -66,53 +66,37 @@ class ExecutionEngine:
 
                     delta = int((exec_time - now_dt).total_seconds())
 
-                    self.market_state[sym]["tplus"] = Text(
-                        f"{max(delta,0)}s", style="yellow"
-                    )
-
+                    self.market_state[sym]["tplus"] = Text(f"{max(delta,0)}s", style="yellow")
                     self.market_state[sym]["pending"] = Text(
-                        f"{'CHỜ MUA' if side=='BUY' else 'CHỜ BÁN'} {qty}",
+                        f"CHỜ {'MUA' if side=='BUY' else 'BÁN'} {qty}",
                         style="cyan"
                     )
             else:
                 self.market_state[sym]["pending"] = Text(
                     f"{'MUA' if side=='BUY' else 'BÁN'} {qty}",
-                    style="blue"
+                    style="blue" if side == "BUY" else "red"
                 )
 
     def build_table(self):
         table = Table(title="Execution Engine Monitor", box=box.SQUARE)
 
         table.add_column("Mã", style="bold cyan")
-        table.add_column("Giá Mua 1", justify="right", style="green")
-        table.add_column("KL Mua 1", justify="right", style="green")
-        table.add_column("Giá Bán 1", justify="right", style="orange3")
-        table.add_column("KL Bán 1", justify="right", style="orange3")
-        table.add_column("T hàng về", justify="right", style="yellow")
+        table.add_column("BidPx", justify="right")
+        table.add_column("BidQty", justify="right")
+        table.add_column("AskPx", justify="right")
+        table.add_column("AskQty", justify="right")
+        table.add_column("T hàng về", justify="right")
         table.add_column("Lệnh chờ")
         table.add_column("Tín hiệu")
 
         for sym in self.symbol_map.keys():
-            data = self.market_state[sym]
+            d = self.market_state[sym]
 
-            # PRICE DISPLAY
-            p_bid = Text(f'{data["bid_px"]:.2f}', style="green") if data["bid_px"] else Text("-")
-            q_bid = Text(f'{int(data["bid_qty"])}', style="green") if data["bid_qty"] else Text("-")
+            p_bid = Text(f'{d["bid_px"]:.2f}', style="green") if d["bid_px"] else Text("-")
+            q_bid = Text(f'{int(d["bid_qty"])}', style="green") if d["bid_qty"] else Text("-")
 
-            p_ask = Text(f'{data["ask_px"]:.2f}', style="orange3") if data["ask_px"] else Text("-")
-            q_ask = Text(f'{int(data["ask_qty"])}', style="orange3") if data["ask_qty"] else Text("-")
-
-            # PENDING ORDER COLOR
-            pending = data["pending"]
-            if isinstance(pending, Text):
-                txt = pending.plain.upper()
-                if "MUA" in txt:
-                    pending.stylize("blue")
-                elif "BÁN" in txt:
-                    pending.stylize("red")
-
-            # SIGNAL COLOR (already set, just ensure)
-            signal = data["signal"]
+            p_ask = Text(f'{d["ask_px"]:.2f}', style="orange3") if d["ask_px"] else Text("-")
+            q_ask = Text(f'{int(d["ask_qty"])}', style="orange3") if d["ask_qty"] else Text("-")
 
             table.add_row(
                 sym,
@@ -120,9 +104,9 @@ class ExecutionEngine:
                 q_bid,
                 p_ask,
                 q_ask,
-                data["tplus"],
-                pending,
-                signal
+                d["tplus"],
+                d["pending"],
+                d["signal"]
             )
 
         return table
@@ -175,14 +159,12 @@ class ExecutionEngine:
 
                 delta = (exec_time - now_dt).total_seconds()
 
-                if delta > 0:
-                    self.market_state[symbol]["tplus"] = Text(
-                        f"{int(delta)}s", style="yellow"
-                    )
-                else:
-                    self.market_state[symbol]["tplus"] = Text("0", style="red")
+                self.market_state[symbol]["tplus"] = Text(
+                    f"{max(int(delta),0)}s",
+                    style="yellow" if delta > 0 else "red"
+                )
 
-                if delta <= 0.1:
+                if delta <= 0:
                     asyncio.create_task(
                         self.execute_tplus(symbol, side, qty, loan_package_id, sid)
                     )
@@ -234,26 +216,24 @@ class ExecutionEngine:
             if side == "BUY":
                 if not best_offer:
                     continue
-                book_price = best_offer.price
-                book_qty = best_offer.quantity
-                trigger = (book_price <= target_price) and (book_qty <= qty_threshold)
+                trigger = best_offer.price <= target_price and best_offer.quantity <= qty_threshold
+                price = best_offer.price
             else:
                 if not best_bid:
                     continue
-                book_price = best_bid.price
-                book_qty = best_bid.quantity
-                trigger = (book_price >= target_price) and (book_qty <= qty_threshold)
+                trigger = best_bid.price >= target_price and best_bid.quantity <= qty_threshold
+                price = best_bid.price
 
             if trigger:
-                self.execute_order(symbol, side, qty, book_price, loan_package_id)
+                self.execute_order(symbol, side, qty, price, loan_package_id, order_type="MTL")
 
                 self.market_state[symbol]["signal"] = Text(
-                    f"{'MUA' if side=='BUY' else 'BÁN'} {qty} @ {book_price:.2f}",
+                    f"{'MUA' if side=='BUY' else 'BÁN'} {qty} @ {price:.2f}",
                     style="green" if side=="BUY" else "red"
                 )
 
-                self.market_state[symbol]["pending"] = Text("DONE", style="green")
-                self.market_state[symbol]["tplus"] = "-"
+                self.market_state[symbol]["pending"] = Text("DONE", style="bold green")
+                self.market_state[symbol]["tplus"] = Text("-")
 
                 self.active[sid] = False
                 self.last_exec_time[key] = now_ts
@@ -263,37 +243,74 @@ class ExecutionEngine:
     async def execute_tplus(self, symbol, side, qty, loan_package_id, sid):
         await asyncio.sleep(1)
 
-        best_bid = self.market_state[symbol]["bid_px"]
-        best_offer = self.market_state[symbol]["ask_px"]
+        tz = timezone(timedelta(hours=7))
+        now = datetime.now(tz).time()
 
-        price = best_offer if side == "BUY" else best_bid
+        ato_start = datetime.strptime("09:00:00", "%H:%M:%S").time()
+        ato_end   = datetime.strptime("09:15:00", "%H:%M:%S").time()
 
-        if not price:
-            return
+        atc_start = datetime.strptime("14:30:00", "%H:%M:%S").time()
+        atc_end   = datetime.strptime("14:45:00", "%H:%M:%S").time()
 
-        self.execute_order(symbol, side, qty, price, loan_package_id)
+        # ---------------- SESSION LOGIC ----------------
+        if ato_start <= now <= ato_end:
+            order_type = "ATO"
+            price = 0
+            label = "ATO"
+            price_txt = "ATO"
 
-        self.market_state[symbol]["signal"] = Text(
-            f"[T+] {'MUA' if side=='BUY' else 'BÁN'} {qty} @ {price:.2f}",
-            style="green" if side=="BUY" else "red"
+        elif atc_start <= now <= atc_end:
+            order_type = "ATC"
+            price = 0
+            label = "ATC"
+            price_txt = "ATC"
+
+        else:
+            best_bid = self.market_state[symbol]["bid_px"]
+            best_offer = self.market_state[symbol]["ask_px"]
+
+            price = best_offer if side == "BUY" else best_bid
+            if not price:
+                return
+
+            order_type = "MTL"
+            label = "MKT"
+            price_txt = f"{price:.2f}"
+
+        # ---------------- EXECUTE ----------------
+        self.execute_order(
+            symbol,
+            side,
+            qty,
+            price,
+            loan_package_id,
+            order_type=order_type
         )
 
-        self.market_state[symbol]["pending"] = Text("DONE", style="green")
+        # ---------------- UI UPDATE ----------------
+        self.market_state[symbol]["signal"] = Text(
+            f"[T+] {label} {side} {qty} @ {price_txt}",
+            style="green" if side == "BUY" else "red"
+        )
+
+        self.market_state[symbol]["pending"] = Text("DONE", style="bold green")
         self.market_state[symbol]["tplus"] = Text("DONE", style="bold green")
 
         self.active[sid] = False
 
-    def execute_order(self, symbol, side, qty, price, loan_package_id):
+    def execute_order(self, symbol, side, qty, price, loan_package_id, order_type="MTL"):
         payload = {
             "accountNo": self.account_no,
             "symbol": symbol,
             "side": side,
-            "orderType": "LO",
-            "price": int(price * 1000) if price < 1000 else int(price),
+            "orderType": order_type,
             "quantity": qty
         }
 
-        self.logger.warning(f"EXECUTE {symbol} {side} {qty} @ {price}")
+        if order_type not in ["ATO", "ATC"]:
+            payload["price"] = int(price * 1000) if price < 1000 else int(price)
+
+        self.logger.warning(f"EXECUTE {symbol} {side} {qty} {order_type} @ {price}")
 
         status, body = self.rest_client.post_order(
             market_type="STOCK",
