@@ -172,7 +172,7 @@ class ExecutionEngine:
             if hasattr(self, "live"):
                 self.live.update(self.build_table())
 
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.05)
 
     def on_quote(self, quote):
         symbol = quote.symbol
@@ -235,7 +235,7 @@ class ExecutionEngine:
                 self.market_state[symbol]["pending"] = Text("DONE", style="bold green")
                 self.market_state[symbol]["tplus"] = Text("-")
 
-                self.active[sid] = False
+                self.active[sid] = Falsew
                 self.last_exec_time[key] = now_ts
 
         self.live.update(self.build_table())
@@ -320,5 +320,7 @@ class ExecutionEngine:
             dry_run=self.test,
             loan_package_id=loan_package_id
         )
+        
+        
 
         self.logger.warning(f"RESULT {symbol} -> {status}")
