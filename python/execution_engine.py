@@ -40,7 +40,8 @@ class ExecutionEngine:
 
         self.last_exec_time = {}
         self.logger = setup_logger_global("ExecutionEngine", "engine.log")
-
+        
+        self.ui_lock = asyncio.Lock()
         self._init_state()
 
     def _load_config(self, path):
@@ -111,6 +112,12 @@ class ExecutionEngine:
 
         return table
 
+    async def update_ui(self):
+        if not hasattr(self, "live"):
+            return
+        async with self.ui_lock:
+            self.live.update(self.build_table())
+
     async def start(self):
         symbols = list(self.symbol_map.keys())
 
@@ -164,13 +171,15 @@ class ExecutionEngine:
                     style="yellow" if delta > 0 else "red"
                 )
 
-                if delta <= 0:
+                if delta <= 0 and self.active[sid]:
+                    # MANDATORY: Set active to False BEFORE creating the task 
+                    # to prevent duplicate triggers in the next scheduler tick.
+                    self.active[sid] = False
                     asyncio.create_task(
                         self.execute_tplus(symbol, side, qty, loan_package_id, sid)
                     )
 
-            if hasattr(self, "live"):
-                self.live.update(self.build_table())
+            await self.update_ui()
 
             await asyncio.sleep(0.025)
 
@@ -232,6 +241,11 @@ class ExecutionEngine:
                 price = best_bid.price
 
             if trigger:
+                # IMMEDIATE LOCK: Set active to False before executing the order
+                # to prevent double triggers if subsequent quotes arrive quickly.
+                self.active[sid] = False
+                self.last_exec_time[key] = now_ts
+                
                 self.execute_order(symbol, side, qty, price, loan_package_id, order_type="MTL")
 
                 # Display price in Thousand Scale for consistency
@@ -244,10 +258,7 @@ class ExecutionEngine:
                 self.market_state[symbol]["pending"] = Text("DONE", style="bold green")
                 self.market_state[symbol]["tplus"] = Text("-")
 
-                self.active[sid] = False
-                self.last_exec_time[key] = now_ts
-
-        self.live.update(self.build_table())
+        asyncio.create_task(self.update_ui())
 
     async def execute_tplus(self, symbol, side, qty, loan_package_id, sid):
         await asyncio.sleep(1)
