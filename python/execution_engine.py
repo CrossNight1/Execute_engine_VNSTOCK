@@ -172,7 +172,7 @@ class ExecutionEngine:
             if hasattr(self, "live"):
                 self.live.update(self.build_table())
 
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.025)
 
     def on_quote(self, quote):
         symbol = quote.symbol
