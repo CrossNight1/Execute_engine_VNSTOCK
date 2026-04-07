@@ -210,32 +210,41 @@ class ExecutionEngine:
             side = cfg["order_side"]
             qty = cfg["quantity"]
             target_price = float(cfg["price"])
+            # Normalize target and market price to VND (Normal Scale)
+            target_price_vnd = int(target_price * 1000) if target_price < 1000 else int(target_price)
+            
             qty_threshold = cfg["qty_threshold"]
             loan_package_id = cfg["loan_package_id"]
 
             if side == "BUY":
                 if not best_offer:
                     continue
-                trigger = best_offer.price <= target_price and best_offer.quantity <= qty_threshold
+                
+                market_price_vnd = int(best_offer.price * 1000) if best_offer.price < 1000 else int(best_offer.price)
+                trigger = market_price_vnd <= target_price_vnd and best_offer.quantity <= qty_threshold
                 price = best_offer.price
             else:
                 if not best_bid:
                     continue
-                trigger = best_bid.price >= target_price and best_bid.quantity <= qty_threshold
+                
+                market_price_vnd = int(best_bid.price * 1000) if best_bid.price < 1000 else int(best_bid.price)
+                trigger = market_price_vnd >= target_price_vnd and best_bid.quantity <= qty_threshold
                 price = best_bid.price
 
             if trigger:
                 self.execute_order(symbol, side, qty, price, loan_package_id, order_type="MTL")
 
+                # Display price in Thousand Scale for consistency
+                display_price = price if price < 1000 else price / 1000
                 self.market_state[symbol]["signal"] = Text(
-                    f"{'MUA' if side=='BUY' else 'BÁN'} {qty} @ {price:.2f}",
+                    f"{'MUA' if side=='BUY' else 'BÁN'} {qty} @ {display_price:.2f}",
                     style="green" if side=="BUY" else "red"
                 )
 
                 self.market_state[symbol]["pending"] = Text("DONE", style="bold green")
                 self.market_state[symbol]["tplus"] = Text("-")
 
-                self.active[sid] = Falsew
+                self.active[sid] = False
                 self.last_exec_time[key] = now_ts
 
         self.live.update(self.build_table())
@@ -275,7 +284,9 @@ class ExecutionEngine:
 
             order_type = "MTL"
             label = "MKT"
-            price_txt = f"{price:.2f}"
+            # Normalize display price to thousand scale
+            display_price = price if price < 1000 else price / 1000
+            price_txt = f"{display_price:.2f}"
 
         # ---------------- EXECUTE ----------------
         self.execute_order(

@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 import inquirer
 import asyncio
+import traceback
+import sys
 from dotenv import load_dotenv, set_key
 from dnse import DNSEClient
 from trading_websocket import TradingClient
@@ -30,6 +32,34 @@ def pause():
     print()
     input("Nhấn Enter để tiếp tục...")
     print()
+
+# --------------------------
+# ERROR HANDLING
+# --------------------------
+def handle_errors(func):
+    if asyncio.iscoroutinefunction(func):
+        async def async_wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                itb = sys.exc_info()[2]
+                stack = traceback.extract_tb(itb)
+                # Get the last entry in the stack which is usually the source of the error
+                last_trace = stack[-1]
+                print(f"❌ Lỗi: {e} (File: {last_trace.filename.split('/')[-1]}, Dòng: {last_trace.lineno})")
+                pause()
+        return async_wrapper
+    else:
+        def sync_wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                itb = sys.exc_info()[2]
+                stack = traceback.extract_tb(itb)
+                last_trace = stack[-1]
+                print(f"❌ Lỗi: {e} (File: {last_trace.filename.split('/')[-1]}, Dòng: {last_trace.lineno})")
+                pause()
+        return sync_wrapper
 
 def header(title):
     print("\n" + "=" * 50)
@@ -89,6 +119,7 @@ def clear_config():
 # --------------------------
 # VIEW CONFIG
 # --------------------------
+@handle_errors
 def view_config():
     config = load_config()
     header("DANH SÁCH CẤU HÌNH")
@@ -115,6 +146,7 @@ def view_config():
 # --------------------------
 # ADD CONFIG
 # --------------------------
+@handle_errors
 def add_config():
     config = load_config()
     header("THÊM CẤU HÌNH")
@@ -212,7 +244,10 @@ def add_config():
     while True:
         try:
             qty = int(input("\nNhập khối lượng: "))
-        except:
+            if qty <= 0:
+                print("\n⚠️ Khối lượng phải > 0")
+                continue
+        except ValueError:
             print("\n❌ Nhập số hợp lệ\n")
             continue
 
@@ -300,6 +335,7 @@ def add_config():
 # --------------------------
 # DELETE CONFIG
 # --------------------------
+@handle_errors
 def delete_config():
     config = load_config()
     header("XOÁ CẤU HÌNH")
@@ -332,6 +368,7 @@ def delete_config():
 # --------------------------
 # UPDATE API
 # --------------------------
+@handle_errors
 def update_api():
     header("CẬP NHẬT API")
 
@@ -340,6 +377,9 @@ def update_api():
 
     set_key(str(ENV_PATH), "API_KEY", api_key)
     set_key(str(ENV_PATH), "API_SECRET", api_secret)
+    
+    # Reload environment variables for current session
+    load_dotenv(ENV_PATH, override=True)
 
     print("\n✅ OK\n")
     pause()
@@ -382,6 +422,7 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
+@handle_errors
 async def run_engine():
     header("CHẠY ENGINE")
 
