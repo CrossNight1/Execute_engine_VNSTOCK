@@ -221,14 +221,14 @@ class ExecutionEngine:
                     continue
                 
                 market_price_vnd = int(best_offer.price * 1000) if best_offer.price < 1000 else int(best_offer.price)
-                trigger = market_price_vnd <= target_price_vnd and best_offer.quantity <= qty_threshold
+                trigger = market_price_vnd <= target_price_vnd and best_offer.quantity * 10 <= qty_threshold
                 price = best_offer.price
             else:
                 if not best_bid:
                     continue
                 
                 market_price_vnd = int(best_bid.price * 1000) if best_bid.price < 1000 else int(best_bid.price)
-                trigger = market_price_vnd >= target_price_vnd and best_bid.quantity <= qty_threshold
+                trigger = market_price_vnd >= target_price_vnd and best_bid.quantity * 10 <= qty_threshold
                 price = best_bid.price
 
             if trigger:
