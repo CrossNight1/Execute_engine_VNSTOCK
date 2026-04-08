@@ -212,51 +212,61 @@ class ExecutionEngine:
             key = f"{symbol}_{sid}"
             now_ts = now_dt.timestamp()
 
+            # ✅ CHECK LAST EXEC TIME FIRST (prevent double trigger)
             if key in self.last_exec_time:
                 if now_ts - self.last_exec_time[key] < 5:
                     continue
 
+            # ✅ LOCK IMMEDIATELY before any async operations
+            self.active[sid] = False
+            self.last_exec_time[key] = now_ts
+
             side = cfg["order_side"]
             qty = cfg["quantity"]
             target_price = float(cfg["price"])
-            # Normalize target and market price to VND (Normal Scale)
-            target_price_vnd = int(target_price * 1000) if target_price < 1000 else int(target_price)
-            
             qty_threshold = cfg["qty_threshold"]
             loan_package_id = cfg["loan_package_id"]
+
+            # ✅ STANDARDIZE: Assume input is in thousand-scale VND (e.g., 100.5)
+            # WS provides prices already in thousand-scale
+            trigger = False
+            price = None
 
             if side == "BUY":
                 if not best_offer:
                     continue
                 
-                market_price_vnd = int(best_offer.price * 1000) if best_offer.price < 1000 else int(best_offer.price)
-                trigger = market_price_vnd <= target_price_vnd and self.market_state[symbol]["ask_qty"] <= qty_threshold
+                trigger = (
+                    best_offer.price <= target_price and 
+                    best_offer.quantity * 10 <= qty_threshold
+                )
                 price = best_offer.price
-            else:
+
+            else:  # SELL
                 if not best_bid:
                     continue
                 
-                market_price_vnd = int(best_bid.price * 1000) if best_bid.price < 1000 else int(best_bid.price)
-                trigger = market_price_vnd >= target_price_vnd and self.market_state[symbol]["bid_qty"] <= qty_threshold
+                trigger = (
+                    best_bid.price >= target_price and 
+                    best_bid.quantity * 10 <= qty_threshold
+                )
                 price = best_bid.price
 
             if trigger:
-                # IMMEDIATE LOCK: Set active to False before executing the order
-                # to prevent double triggers if subsequent quotes arrive quickly.
-                self.active[sid] = False
-                self.last_exec_time[key] = now_ts
-                
-                self.execute_order(symbol, side, qty, price, loan_package_id, order_type="MTL")
-
-                # Display price in Thousand Scale for consistency
-                display_price = price if price < 1000 else price / 1000
-                self.market_state[symbol]["signal"] = Text(
-                    f"{'MUA' if side=='BUY' else 'BÁN'} {qty} @ {display_price:.2f}",
-                    style="green" if side=="BUY" else "red"
+                self.execute_order(
+                    symbol, side, qty, price, 
+                    loan_package_id, order_type="MTL"
                 )
 
+                self.market_state[symbol]["signal"] = Text(
+                    f"{'MUA' if side=='BUY' else 'BÁN'} {qty} @ {price:.2f}",
+                    style="green" if side=="BUY" else "red"
+                )
                 self.market_state[symbol]["pending"] = Text("DONE", style="bold green")
-                self.market_state[symbol]["tplus"] = Text("-")
+            else:
+                # ✅ RE-ENABLE if trigger condition not met
+                self.active[sid] = True
+                del self.last_exec_time[key]
 
         asyncio.create_task(self.update_ui())
 
@@ -330,9 +340,13 @@ class ExecutionEngine:
         }
 
         if order_type not in ["ATO", "ATC"]:
+            # ✅ Price is already in thousand-scale, convert to raw VND
             payload["price"] = int(price * 1000) if price < 1000 else int(price)
 
-        self.logger.warning(f"EXECUTE {symbol} {side} {qty} {order_type} @ {price}")
+        self.logger.warning(
+            f"EXECUTE {symbol} {side} {qty} {order_type} @ {price} "
+            f"(raw_vnd={payload.get('price', 'N/A')})"
+        )
 
         status, body = self.rest_client.post_order(
             market_type="STOCK",

@@ -188,7 +188,11 @@ def add_config():
     threshold = None
 
     if not is_tplus:
-        price = float(input("Giá mục tiêu: "))
+        raw_price = float(input("Giá mục tiêu: "))
+        if raw_price <= 1000:
+            price = raw_price / 1000
+        else:
+            price = raw_price
 
     status_api, body = rest_client.get_loan_packages(
         account_no=account_no,
@@ -221,7 +225,7 @@ def add_config():
             account_no=account_no,
             market_type="STOCK",
             symbol=symbol,
-            price=int(price * 1000) if price < 1000 else int(price),
+            price=int(price * 1000),
             loan_package_id=loan_package_id,
             dry_run=False,
         )
