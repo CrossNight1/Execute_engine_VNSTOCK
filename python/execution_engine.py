@@ -365,4 +365,4 @@ class ExecutionEngine:
         status, body = self.rest_client.post_order(
         )
 
-        self.logger.info(f"RESULT {symbol} -> {status}")
+        self.logger.info(f"RESULT {symbol} -> {status} | {body}")
