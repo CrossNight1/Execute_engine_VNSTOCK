@@ -235,11 +235,12 @@ class ExecutionEngine:
             if side == "BUY":
                 if not best_offer:
                     continue
-                
+                        
                 trigger = (
-                    best_offer.price <= target_price and 
+                    best_offer.price >= target_price and 
                     best_offer.quantity * 10 <= qty_threshold
                 )
+                
                 price = best_offer.price
 
             else:  # SELL
@@ -247,7 +248,7 @@ class ExecutionEngine:
                     continue
                 
                 trigger = (
-                    best_bid.price >= target_price and 
+                    best_bid.price <= target_price and 
                     best_bid.quantity * 10 <= qty_threshold
                 )
                 price = best_bid.price
@@ -343,12 +344,12 @@ class ExecutionEngine:
             # ✅ Price is already in thousand-scale, convert to raw VND
             payload["price"] = int(price * 1000) if price < 1000 else int(price)
 
-        self.logger.warning(
+        self.logger.info(
             f"EXECUTE {symbol} {side} {qty} {order_type} @ {price} "
             f"(raw_vnd={payload.get('price', 'N/A')})"
         )
 
-        status, body = self.rest_client.post_order(
+        params = dict(
             market_type="STOCK",
             payload=payload,
             trading_token=self.trading_token,
@@ -356,7 +357,12 @@ class ExecutionEngine:
             dry_run=self.test,
             loan_package_id=loan_package_id
         )
-        
-        
 
-        self.logger.warning(f"RESULT {symbol} -> {status}")
+        self.logger.debug(f"POST_ORDER {symbol} {side} {qty} {order_type} @ {price} "
+                          f"(raw_vnd={payload.get('price', 'N/A')})"
+                          f" params={params}")
+
+        status, body = self.rest_client.post_order(
+        )
+
+        self.logger.info(f"RESULT {symbol} -> {status}")

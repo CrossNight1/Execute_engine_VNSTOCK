@@ -190,9 +190,9 @@ def add_config():
     if not is_tplus:
         raw_price = float(input("Giá mục tiêu: "))
         if raw_price <= 1000:
-            price = raw_price / 1000
-        else:
             price = raw_price
+        else:
+            price = raw_price / 1000
 
     status_api, body = rest_client.get_loan_packages(
         account_no=account_no,
