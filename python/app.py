@@ -539,8 +539,6 @@ def main_menu():
 
     except KeyboardInterrupt:
         print("\n⚠️ Thoát menu\n")
-    finally:
-        clear_config()
 
 
 if __name__ == "__main__":

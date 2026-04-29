@@ -135,7 +135,19 @@ class ExecutionEngine:
         print("")
         with Live(self.build_table(), refresh_per_second=5) as live:
             self.live = live
-            await asyncio.sleep(8 * 60 * 60)
+            
+            ui_task = asyncio.create_task(self._ui_updater_loop())
+            try:
+                await asyncio.sleep(8 * 60 * 60)
+            finally:
+                ui_task.cancel()
+
+    async def _ui_updater_loop(self):
+        while True:
+            await asyncio.sleep(0.2)
+            async with self.ui_lock:
+                if hasattr(self, "live"):
+                    self.live.update(self.build_table())
 
     async def tplus_scheduler(self):
         tz = timezone(timedelta(hours=7))
@@ -179,9 +191,7 @@ class ExecutionEngine:
                         self.execute_tplus(symbol, side, qty, loan_package_id, sid)
                     )
 
-            await self.update_ui()
-
-            await asyncio.sleep(0.025)
+            await asyncio.sleep(0.5)
 
     def on_quote(self, quote):
         symbol = quote.symbol
@@ -268,8 +278,6 @@ class ExecutionEngine:
                 # ✅ RE-ENABLE if trigger condition not met
                 self.active[sid] = True
                 del self.last_exec_time[key]
-
-        asyncio.create_task(self.update_ui())
 
     async def execute_tplus(self, symbol, side, qty, loan_package_id, sid):
         await asyncio.sleep(1)
