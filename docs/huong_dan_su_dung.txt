@@ -1,0 +1,49 @@
+HƯỚNG DẪN SỬ DỤNG GIAO DIỆN WEB (VNSTOCK ENGINE)
+
+I. QUẢN LÝ TÀI KHOẢN (Multi-Account)
+Hệ thống cho phép bạn điều khiển nhiều tài khoản DNSE cùng lúc một cách độc lập.
+1. Thêm tài khoản mới:
+- Chọn tab "Quản Lý Tài Khoản" trên Menu chính.
+- Điền Tên Gợi Nhớ (Ví dụ: TK Vợ, Quỹ Giao Dịch A) để dễ phân biệt.
+- Điền API KEY và API SECRET (có thể tạo trong mục Quản trị API trên Web của DNSE).
+- Nhấn "Thêm Tài Khoản". Hệ thống sẽ kết nối với DNSE để lấy mã Account No.
+2. Quản lý luồng xử lý:
+- Sau khi thêm tài khoản, ở góc phải thanh Header (trên cùng màn hình), bạn sẽ thấy một Dropdown (Menu thả xuống).
+- HÃY NHỚ CHỌN TÀI KHOẢN MÀ BẠN MUỐN THAO TÁC.
+- Mọi cấu hình lệnh bạn tạo, trạng thái "Sức mua / bán", hay việc chạy/dừng Engine đều sẽ chỉ được áp dụng trên Tài Khoản Hiện Đang Chọn ở Dropdown này.
+
+II. TẠO CẤU HÌNH LỆNH
+Chọn tab "Dashboard", tại khu vực "Thêm lệnh mới" ở bên trái:
+1. Chế độ NORMAL (Săn lệnh giá/thanh khoản):
+- Bắt buộc điền Mã cổ phiếu, Chọn Loại lệnh (MUA/BÁN), Khối lượng, Loại Khớp Lệnh (LO/MTL).
+- Bắt buộc điền Giá mục tiêu (Nhớ quy tắc chia 1000, VD: 25.5) và Ngưỡng khối lượng kích hoạt.
+- BƯỚC QUAN TRỌNG: Bạn bắt buộc phải ấn nút "🔍 Kiểm tra sức mua / bán".
+  + Hệ thống sẽ gọi API DNSE để tính toán sức mua (PPSE) tối đa hiện tại của tài khoản.
+  + Nếu khối lượng bạn nhập vượt quá hạn mức, hệ thống sẽ cảnh báo đỏ. Bạn bắt buộc phải giảm khối lượng hoặc tick vào ô "Vẫn tiếp tục dù vượt sức mua/bán" để ghi đè (không khuyến nghị vì lệnh bắn lên có thể bị DNSE từ chối - Rejected).
+- Nhấn "Thêm Cấu Hình".
+
+2. Chế độ TPLUS (Hẹn giờ chạy ATO/ATC/Trong phiên):
+- Chọn Chế độ: Đợi T+.
+- Bắt buộc nhập Thời gian thực hiện theo chuẩn (HH:MM:SS), ví dụ: 14:30:00 (chuẩn bị mở ATC).
+- Ô Giá mục tiêu sẽ tự động ẩn đi NẾU bạn chọn Loại Lệnh là MTL. Nếu bạn muốn đặt chờ giới hạn (LO) tại thời điểm đó, hãy chọn LO và nhập Giá mục tiêu.
+- Nhấn "Thêm Cấu Hình". (Chế độ này không kiểm tra sức mua nghiêm ngặt trước khi lưu).
+
+III. VẬN HÀNH ENGINE
+- Tại khu vực "Điều khiển Engine" (Bên phải Dashboard):
+1. Lấy mã Smart OTP 6 số từ ứng dụng DNSE trên điện thoại.
+2. Điền mã OTP vào ô nhập liệu và nhấn nút "🚀 Chạy Engine".
+3. Trạng thái góc phải trên cùng sẽ chuyển từ "System Idle (OFF)" sang "Engine is Active (RUN)".
+- Ngay lúc này, Bảng Theo Dõi Thời Gian Thực bên dưới sẽ liên tục cập nhật (mỗi 1 giây):
+  + Giá Mua Tốt Nhất (Best Bid) & Khối lượng chờ mua.
+  + Giá Bán Tốt Nhất (Best Ask) & Khối lượng chờ bán.
+  + Số đếm ngược (đối với lệnh T+).
+  + Trạng thái Lệnh chờ và Tín hiệu đã kích hoạt.
+- Bạn có thể chuyển đổi qua lại giữa các Tài Khoản ở thanh Dropdown phía trên để theo dõi Bảng Thời Gian Thực của nhiều tài khoản khác nhau. Engine của mỗi tài khoản là luồng độc lập.
+
+IV. XỬ LÝ SỰ CỐ CƠ BẢN (TROUBLESHOOTING)
+- Badge API báo "API MISSING": Bạn chưa thêm tài khoản nào, hoặc API Key/Secret của tài khoản hiện tại bị sai/hết hạn.
+- Engine tự động tắt ngang (Bảng giá dừng nhảy): Xảy ra khi Smart OTP hết hạn (thường sau vài giờ) hoặc đường truyền WebSocket bị đứt. Hãy lấy OTP mới và nhấn Chạy Engine lại.
+- Lệnh bị trạng thái "Rejected" trên bảng điện DNSE: Hệ thống Engine đã bắn lệnh đi thành công nhưng Sàn (hoặc DNSE) từ chối lệnh của bạn. Nguyên nhân chính:
+  + Sức mua / Sức bán thực tế lúc bắn lệnh không đủ (VD: bạn đã đặt lệnh khác làm giam tiền).
+  + Lỗi vượt biên độ (Giá đặt LO nằm ngoài giá Trần/Sàn trong ngày).
+  + Mua bán khối lượng lẻ (Lô lẻ) trên sàn HOSE không đúng quy định.

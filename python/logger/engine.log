@@ -1,3 +1,0 @@
-[2026-04-15 09:33:42,168][execution_engine.py:354][WARNING] EXECUTE ACB BUY 100 MTL @ 24.1 (raw_vnd=24100)
-[2026-04-15 09:36:59,550][execution_engine.py:347][INFO] EXECUTE ACB BUY 100 MTL @ 24.05 (raw_vnd=24050)
-[2026-04-15 09:36:59,551][execution_engine.py:361][DEBUG] POST_ORDER ACB BUY 100 MTL @ 24.05 (raw_vnd=24050) params={'market_type': 'STOCK', 'payload': {'accountNo': '0003659227', 'symbol': 'ACB', 'side': 'BUY', 'orderType': 'MTL', 'quantity': 100, 'price': 24050}, 'trading_token': 'e0465e7c-267c-486a-911d-0959b763f3b5', 'order_category': 'NORMAL', 'dry_run': False, 'loan_package_id': 1775}

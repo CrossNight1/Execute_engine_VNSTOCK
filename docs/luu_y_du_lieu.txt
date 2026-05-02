@@ -1,0 +1,46 @@
+MÔ TẢ CHI TIẾT LOGIC VÀ QUY ĐỊNH DỮ LIỆU CỦA ENGINE
+
+I. TỔNG QUAN VỀ ENGINE
+Execute Engine là một hệ thống tự động giao dịch, hoạt động trực tiếp trên máy tính của bạn. Hệ thống này kết nối với luồng dữ liệu thời gian thực (WebSocket) của DNSE để giám sát biến động giá và khối lượng trên thị trường. Khi các điều kiện bạn thiết lập được thỏa mãn, hệ thống sẽ tự động gửi lệnh mua/bán (API) lên Sở Giao dịch ngay lập tức.
+
+Hệ thống hoạt động với 2 chế độ (Mode) chính:
+
+1. Chế độ Thường (NORMAL) - Theo dõi Giá & Thanh khoản
+- Mục đích: Săn lệnh hoặc chốt lời/cắt lỗ tự động khi thị trường đạt mức giá mong muốn với thanh khoản phù hợp.
+- Điều kiện kích hoạt:
+  + Đối với lệnh MUA: Hệ thống chờ cho đến khi Giá Bán Rẻ Nhất (Best Offer) trên thị trường giảm xuống nhỏ hơn hoặc bằng (<=) Giá Mục Tiêu của bạn, ĐỒNG THỜI khối lượng đang chờ bán ở mức giá đó phải nhỏ hơn hoặc bằng (<=) Ngưỡng Khối Lượng bạn thiết lập.
+  + Đối với lệnh BÁN: Hệ thống chờ cho đến khi Giá Mua Đắt Nhất (Best Bid) tăng lên lớn hơn hoặc bằng (>=) Giá Mục Tiêu, ĐỒNG THỜI khối lượng đang chờ mua ở mức giá đó phải nhỏ hơn hoặc bằng (<=) Ngưỡng Khối Lượng.
+- Xử lý Đặt Lệnh:
+  + Khi đủ điều kiện, nếu bạn cấu hình Loại Lệnh là LO: Gửi lệnh giới hạn đúng với mức Giá Mục Tiêu.
+  + Nếu bạn cấu hình là MTL: Gửi lệnh thị trường (chấp nhận khớp mọi giá cho đến khi đủ số lượng, quét thanh khoản).
+  + Sau khi gửi thành công 1 lần, cấu hình sẽ tự động bị vô hiệu hóa để tránh bắn lệnh nhiều lần.
+
+2. Chế độ Hẹn Giờ / Đợi T+ (TPLUS) - Giao dịch theo thời gian thực thi
+- Mục đích: Dành cho các chiến lược giao dịch tại một thời điểm cụ thể trong tương lai (ví dụ: bán hàng T+ về tài khoản ngay đầu phiên ATC, hoặc mua vớt ATO).
+- Điều kiện kích hoạt: Hệ thống quét thời gian hiện tại mỗi 0.5 giây. Khi đồng hồ hệ thống vượt qua mốc Thời Gian Cài Đặt (time_execute), lệnh sẽ lập tức được kích hoạt.
+- Xử lý Đặt Lệnh:
+  + Trùng khung giờ ATO (09:00:00 - 09:15:00): Engine tự động đổi loại lệnh thành ATO, bỏ qua cấu hình giá của bạn.
+  + Trùng khung giờ ATC (14:30:00 - 14:45:00): Engine tự động đổi loại lệnh thành ATC.
+  + Ở các thời điểm khác trong phiên khớp lệnh liên tục:
+    * Nếu bạn cài đặt LO: Bắt buộc phải có Giá Mục Tiêu. Lệnh được gửi đi là lệnh giới hạn tại mức giá đó.
+    * Nếu bạn cài đặt MTL: Engine tự động lấy giá tốt nhất trên sổ lệnh lúc đó để lưu log hiển thị, và gửi lệnh MTL (Market) lên sàn.
+
+II. QUY ĐỊNH NHẬP DỮ LIỆU
+1. Mã Cổ Phiếu (Symbol):
+- Nhập chữ in hoa hoặc chữ thường đều được (VD: VND, hpg, Ssi). Hệ thống sẽ tự động in hoa.
+
+2. Khối lượng (Quantity):
+- Nhập số lượng cổ phiếu nguyên, không dùng dấu phẩy hay chấm phân cách hàng nghìn (VD: 100, 1500, 20000).
+- Hệ thống hỗ trợ nút "Kiểm tra sức mua / bán" để đối chiếu số lượng này với hạn mức thực tế mà tài khoản DNSE của bạn đang có.
+
+3. Giá (Price):
+- BẮT BUỘC sử dụng đơn vị "Nghìn VNĐ" (x1000).
+- Ví dụ: Bạn muốn đặt giá 25,500 VNĐ, hãy nhập 25.5 vào ô Giá. Nếu bạn muốn đặt giá 120,000 VNĐ, hãy nhập 120.
+- Không nhập 25500. Hệ thống khi gửi lệnh lên API của DNSE sẽ tự động nhân 1000 để đúng chuẩn dữ liệu của sàn.
+
+4. Ngưỡng Khối Lượng Kích Hoạt (Threshold):
+- Chỉ dùng cho chế độ NORMAL. Đây là lớp bảo vệ giúp bạn không bị khớp lệnh khi thanh khoản ở mức giá mục tiêu quá lớn (ví dụ: tường bán quá dày). Đặt một số lượng cụ thể, VD: 50000.
+
+5. Loại Khớp Lệnh (Order Type):
+- LO: Lệnh giới hạn. Bạn chỉ khớp được ở giá đó hoặc giá tốt hơn. Yêu cầu truyền kèm biến Giá.
+- MTL (Market To Limit): Lệnh thị trường. Bạn chấp nhận khớp ở mức giá tốt nhất trên thị trường hiện tại. Không yêu cầu nhập biến Giá trên UI, payload ngầm định gửi giá = 0 lên Sở.

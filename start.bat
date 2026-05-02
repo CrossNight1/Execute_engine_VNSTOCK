@@ -16,17 +16,30 @@ call .venv\Scripts\activate
 echo Upgrading pip...
 python -m pip install --upgrade pip
 
-IF EXIST "python\requirements.txt" (
+IF EXIST "requirements.txt" (
     echo Installing dependencies...
-    pip install -r python\requirements.txt
+    pip install -r requirements.txt
 ) ELSE (
-    echo Warning: python\requirements.txt not found.
+    echo Warning: requirements.txt not found.
 )
 
+cls
 echo ==================================================
-echo Starting Execution Engine...
+echo Please choose your interface:
+echo [1] Web UI Dashboard (Recommended - Easiest)
+echo [2] Classic Terminal CLI
 echo ==================================================
+set /p choice="Enter choice (1 or 2, default 1): "
+if "%choice%"=="" set choice=1
 
-python python/app.py
+if "%choice%"=="1" (
+    echo Starting Web UI Dashboard...
+    echo Open your browser at http://127.0.0.1:8000
+    start http://127.0.0.1:8000
+    uvicorn web_app:app --host 127.0.0.1 --port 8000 --reload
+) else (
+    echo Starting Terminal CLI...
+    python app.py
+)
 
 pause

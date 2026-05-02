@@ -21,19 +21,32 @@ source .venv/bin/activate
 pip install --upgrade pip
 
 # Install requirements
-if [ -f "python/requirements.txt" ]; then
+if [ -f "requirements.txt" ]; then
     echo "Installing dependencies..."
-    pip install -r python/requirements.txt
+    pip install -r requirements.txt
 else
-    echo "Warning: python/requirements.txt not found."
+    echo "Warning: requirements.txt not found."
 fi
 
+clear
 echo "=================================================="
-echo "Starting Execution Engine..."
+echo "Please choose your interface:"
+echo "[1] Web UI Dashboard (Recommended - Easiest)"
+echo "[2] Classic Terminal CLI"
 echo "=================================================="
+read -p "Enter choice (1 or 2, default 1): " choice
+choice=${choice:-1}
 
-# Run the application
-python3 python/app.py
+if [ "$choice" = "1" ]; then
+    echo "Starting Web UI Dashboard..."
+    echo "Open your browser at http://127.0.0.1:8000"
+    # Wait for uvicorn to start then open browser
+    (sleep 1.5 && open "http://127.0.0.1:8000") &
+    uvicorn web_app:app --host 127.0.0.1 --port 8000 --reload
+else
+    echo "Starting Terminal CLI..."
+    python app.py
+fi
 
 # Deactivate venv on exit
 deactivate
