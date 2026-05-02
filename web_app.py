@@ -66,6 +66,7 @@ def load_accounts():
         return json.load(f)
 
 def save_accounts(data):
+    ACCOUNTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(ACCOUNTS_PATH, "w") as f:
         json.dump(data, f, indent=2)
 
@@ -76,6 +77,7 @@ def load_config():
         return json.load(f)
 
 def save_config(data):
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         json.dump(data, f, indent=2)
 
