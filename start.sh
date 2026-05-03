@@ -5,52 +5,33 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR"
 
 echo "=================================================="
-echo "Setting up virtual environment and dependencies..."
+echo "    VNSTOCK Execution Engine Launcher"
 echo "=================================================="
 
-# Create .venv if it doesn't exist or is invalid
+# 1. Virtual Environment Setup
 if [ ! -d ".venv" ] || [ ! -f ".venv/bin/activate" ]; then
     if [ -d ".venv" ]; then
-        echo "Detected non-Unix .venv or corrupted environment. Recreating..."
+        echo "[!] Detected incompatible environment. Recreating..."
         rm -rf .venv
     fi
-    echo "Creating virtual environment (.venv)..."
+    echo "[+] Creating virtual environment..."
     python3 -m venv .venv
-fi
-
-# Activate virtual environment
-source .venv/bin/activate
-
-# Upgrade pip
-pip install --upgrade pip
-
-# Install requirements
-if [ -f "requirements.txt" ]; then
-    echo "Installing dependencies..."
+    source .venv/bin/activate
+    pip install --upgrade pip
     pip install -r requirements.txt
 else
-    echo "Warning: requirements.txt not found."
+    echo "[+] Activating environment..."
+    source .venv/bin/activate
 fi
 
-clear
-echo "=================================================="
-echo "Please choose your interface:"
-echo "[1] Web UI Dashboard (Recommended - Easiest)"
-echo "[2] Classic Terminal CLI"
-echo "=================================================="
-read -p "Enter choice (1 or 2, default 1): " choice
-choice=${choice:-1}
+# 2. Launch Application
+echo ""
+echo "[+] Starting Web UI Dashboard..."
+echo "[+] Browser will open at http://127.0.0.1:8000"
+echo ""
 
-if [ "$choice" = "1" ]; then
-    echo "Starting Web UI Dashboard..."
-    echo "Open your browser at http://127.0.0.1:8000"
-    # Wait for uvicorn to start then open browser
-    (sleep 1.5 && open "http://127.0.0.1:8000") &
-    uvicorn web_app:app --host 127.0.0.1 --port 8000 --reload
-else
-    echo "Starting Terminal CLI..."
-    python app.py
-fi
+# Launch browser after a short delay
+(sleep 2 && open "http://127.0.0.1:8000") &
 
-# Deactivate venv on exit
-deactivate
+# Start the web application
+uvicorn web_app:app --host 127.0.0.1 --port 8000 --reload
