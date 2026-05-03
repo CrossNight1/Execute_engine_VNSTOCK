@@ -6,7 +6,14 @@ echo ==================================================
 echo Setting up virtual environment and dependencies...
 echo ==================================================
 
-IF NOT EXIST ".venv" (
+IF EXIST ".venv" (
+    IF NOT EXIST ".venv\Scripts\activate" (
+        echo Detected non-Windows .venv or corrupted environment.
+        echo Recreating .venv for Windows...
+        rmdir /s /q .venv
+        python -m venv .venv
+    )
+) ELSE (
     echo Creating virtual environment (.venv)...
     python -m venv .venv
 )
@@ -35,7 +42,7 @@ if "%choice%"=="" set choice=1
 if "%choice%"=="1" (
     echo Starting Web UI Dashboard...
     echo Open your browser at http://127.0.0.1:8000
-    start http://127.0.0.1:8000
+    start /b "" cmd /c "timeout /t 3 > nul && start http://127.0.0.1:8000"
     uvicorn web_app:app --host 127.0.0.1 --port 8000 --reload
 ) else (
     echo Starting Terminal CLI...

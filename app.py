@@ -5,9 +5,9 @@ import asyncio
 import traceback
 import sys
 from dotenv import load_dotenv, set_key
-from dnse import DNSEClient
-from trading_websocket import TradingClient
-from execution_engine import ExecutionEngine
+from src.core.dnse.client import DNSEClient
+from src.core.trading_websocket import TradingClient
+from src.core.execution_engine import ExecutionEngine
 
 # BASE_DIR = Path(__file__).resolve().parent
 
@@ -15,7 +15,7 @@ import sys, os
 BASE_PATH = getattr(sys, '_MEIPASS', os.path.dirname(__file__))
 BASE_DIR = Path(BASE_PATH)
 
-CONFIG_PATH = BASE_DIR / "config.json"
+CONFIG_PATH = BASE_DIR / "data" / "config.json"
 ENV_PATH = BASE_DIR / ".env"
 SESSION_FILE = BASE_DIR / "session.json"
 
@@ -523,7 +523,10 @@ async def run_engine():
 import os
 
 def render_menu():
-    os.system("clear")  # or "cls" on Windows
+    if os.name == 'nt':
+        os.system("cls")
+    else:
+        os.system("clear")
 
     header("MENU CHÍNH")
     print_system_status()

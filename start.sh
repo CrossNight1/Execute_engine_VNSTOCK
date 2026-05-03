@@ -8,8 +8,12 @@ echo "=================================================="
 echo "Setting up virtual environment and dependencies..."
 echo "=================================================="
 
-# Create .venv if it doesn't exist
-if [ ! -d ".venv" ]; then
+# Create .venv if it doesn't exist or is invalid
+if [ ! -d ".venv" ] || [ ! -f ".venv/bin/activate" ]; then
+    if [ -d ".venv" ]; then
+        echo "Detected non-Unix .venv or corrupted environment. Recreating..."
+        rm -rf .venv
+    fi
     echo "Creating virtual environment (.venv)..."
     python3 -m venv .venv
 fi
